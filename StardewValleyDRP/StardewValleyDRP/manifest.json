@@ -1,7 +1,7 @@
 {
   "Name": "DewCord Rich Presence",
   "Author": "explosivetortellini",
-  "Version": "1.0.0",
+  "Version": "1.0.0-BETA",
   "Description": "One or two sentences about the mod",
   "UniqueID": "explosivetortellini.StardewValleyDRP",
   "EntryDll": "StardewValleyDRP.dll",
