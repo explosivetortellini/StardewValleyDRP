@@ -1048,10 +1048,17 @@ namespace Discord
 
         public void RunCallbacks()
         {
-            var res = Methods.RunCallbacks(MethodsPtr);
-            if (res != Result.Ok)
+            Result res = Result.Ok;
+            try
             {
-                throw new ResultException(res);
+                res = Methods.RunCallbacks(MethodsPtr);
+            }
+            catch (AccessViolationException e)
+            {
+                if (res != Result.Ok)
+                {
+                    throw new ResultException(res);
+                }
             }
         }
 
