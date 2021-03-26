@@ -2,20 +2,17 @@
 #define UTCOFFSET
 // ^ allows exception handling
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Text;
-using System.Threading.Tasks;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
-using StardewModdingAPI.Utilities;
 using StardewValley;
 
 namespace StardewValleyDRP
 {
     public class ModEntry : Mod
     {
+        private long modcount;
         public override void Entry(IModHelper helper)
         {
 #if DEBUG
@@ -24,22 +21,22 @@ namespace StardewValleyDRP
             this.Monitor.Log($"IF YOURE NOT TORTELLINI THEN YELL AT HIM TO BUILD IN RELEASE MODE", LogLevel.Alert);
 #endif
             var discord = new Discord.Discord(824160913908039729, (UInt64)Discord.CreateFlags.NoRequireDiscord);
-
+            modcount = helper.ModRegistry.GetAll().Count();
             var Activity = new Discord.Activity
             {
                 State = $"In a Menu",
-                Details = $"Living the Farm Life",
+                Details = $"Living the Valley Life",
                 Timestamps =
                 {
-                    Start = 5,
+                    Start = CurrentTime(),
                 },
                 Assets =
                 {
-                    LargeImage = "placeholder",
-                    LargeText = "Stardew",
-                    SmallImage = "hatsune_mikermit",
-                    SmallText = "Yes",
-                },
+                    LargeImage = "title_card",
+                    LargeText = $"Stardew Valley v{Game1.version}",
+                    SmallImage = "placeholder",
+                    SmallText = $"Running {modcount} mods",
+        },
                 Party =
                 {
                     Id = "foo",
@@ -84,7 +81,7 @@ namespace StardewValleyDRP
 
             helper.Events.GameLoop.DayStarted += this.NewDay;
             helper.Events.GameLoop.UpdateTicked += (sender, e) => this.Update(sender, e, discord, Activity);
-            helper.Events.GameLoop.ReturnedToTitle += (sender, e) => this.TimesUp(sender, e, discord);
+            helper.Events.GameLoop.ReturnedToTitle += (sender, e) => this.TimesUp(sender, e, discord, Activity);
         }
         /// <summary>
         /// Runs at the start of every new day to update rich presence
@@ -117,7 +114,7 @@ namespace StardewValleyDRP
             //activityManager.RegisterCommand("steam://run-game-id/413150");
             try
             {
-                if (e.IsMultipleOf(30))
+                if (e.IsMultipleOf(20))
                 {
                     activityManager.UpdateActivity(CheckActivity(activity), (result) =>
                     {
@@ -150,12 +147,12 @@ namespace StardewValleyDRP
             if (!Context.IsWorldReady)
             {
                 a.State = "In a Menu";
-                a.Details = "Living the Farm Life";
-                a.Assets.LargeText = "Stardew";
-                a.Assets.LargeImage = "menu_small_icon";
-                a.Assets.SmallText = "Yes";
-                a.Assets.SmallImage = "menu_small_icon";
-                a.Timestamps.Start = 5;
+                a.Details = "Living the Valley Life";
+                a.Assets.LargeText = $"Stardew Valley v{Game1.version}";
+                a.Assets.LargeImage = "title_card";
+                a.Assets.SmallImage = "placeholder";
+                a.Assets.SmallText = $"Running {modcount} mods";
+                a.Timestamps.Start = CurrentTime();
                 a.Party.Size.CurrentSize = 1;
                 a.Party.Size.MaxSize = 1;
             }
@@ -171,7 +168,7 @@ namespace StardewValleyDRP
                         deets = "Hosting Co-op";
                     else
                         deets = "Playing Co-op";
-                    a.Details = $"{deets} ({Game1.numberOfPlayers()} of {a.Party.Size.MaxSize})";
+                    a.Details = $"{PlayerRank()} - {deets} ({Game1.numberOfPlayers()} of {a.Party.Size.MaxSize})";
                 }
                 else
                 {
@@ -182,22 +179,17 @@ namespace StardewValleyDRP
                 a.Assets.LargeText = $"At {SplitName(Game1.currentLocation.Name)}";
                 a.Assets.SmallImage = $"weather_{Weather_type()}_icon";
                 a.Assets.SmallText = $"Day {Game1.dayOfMonth} of {Season()}, Year {Game1.year}";
-                a.Timestamps.Start = InGameTime(); //InGameTime(); //Game1.timeOfDay;
+                a.Timestamps.Start = InGameTime();
 #if DEBUG
                 this.Monitor.Log($"Ingame Time UTC: {InGameTime()} vs. {Game1.timeOfDay}", LogLevel.Debug);
 #endif
             }
             return a;
         }
-        /// <summary>
-        /// Calls the Discord Dispose function 
-        /// </summary>
-        /// <param name="sender">Sender.</param>
-        /// <param name="e">Returned to title event args</param>
-        /// <param name="discord">Discord object.</param>
-            private void TimesUp(object sender, ReturnedToTitleEventArgs e, Discord.Discord discord)
+
+            private void TimesUp(object sender, ReturnedToTitleEventArgs e, Discord.Discord discord, Discord.Activity acc)
         {
-            discord.Dispose();
+            Update(null, null, discord, acc);
         }
 
         private string Farmlayout_type()
@@ -214,8 +206,12 @@ namespace StardewValleyDRP
                     return "hilltop";
                 case Farm.combat_layout:
                     return "wilderness";
+                case Farm.beach_layout:
+                    return "beach";
+                case Farm.fourCorners_layout:
+                    return "corners";
                 default:
-                    return "default";
+                    return "standard";
             }
         }
         /// <summary>
@@ -322,6 +318,13 @@ namespace StardewValleyDRP
             this.Monitor.Log($"Hours in sec {hours * 3600 } minutes in sec {mins * 60}", LogLevel.Debug);
 #endif
             return (offset) - ((hours * 60 /*minutes*/ * 60 /*seconds*/) + (mins * 60 /*seconds*/));
+        }
+        private long CurrentTime()
+        {
+            DateTime current = DateTime.UtcNow;
+            DateTime UTCCE = new DateTime(1970, 1, 1);
+            TimeSpan time = current.Subtract(UTCCE);
+            return (((long)time.TotalSeconds / 100) * 100);
         }
     }
 }
