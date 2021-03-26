@@ -1,4 +1,5 @@
 ﻿#define EHTRUE
+#define UTCOFFSET
 // ^ allows exception handling
 using System;
 using System.Collections.Generic;
@@ -27,21 +28,21 @@ namespace StardewValleyDRP
             var Activity = new Discord.Activity
             {
                 State = $"In a Menu",
-                Details = $" ",
+                Details = $"Living the Farm Life",
                 Timestamps =
                 {
-                    Start = 0,
+                    Start = 5,
                 },
                 Assets =
                 {
-                    LargeImage = " ",
-                    LargeText = " ",
-                    SmallImage = " ",
-                    SmallText = " ",
+                    LargeImage = "placeholder",
+                    LargeText = "Stardew",
+                    SmallImage = "hatsune_mikermit",
+                    SmallText = "Yes",
                 },
                 Party =
                 {
-                    Id = "foo partyID",
+                    Id = "foo",
                     Size =
                     {
                         CurrentSize = 1,
@@ -51,18 +52,15 @@ namespace StardewValleyDRP
 
                 Secrets =
                 {
-                    Match = " ",
-                    Join = " ",
-                    Spectate = " ",
+                    Match = "bar",
+                    Join = "baz",
                 },
                 Instance = true,
             };
             var userManager = discord.GetUserManager();
-            /*
             var imageManager = discord.GetImageManager();
             var lobbyManager = discord.GetLobbyManager(); 
             var applicationManager = discord.GetApplicationManager();
-            */
 #if CALLBACK
             // Return via callback
             userManager.GetUser(290926444748734465, (Discord.Result result, ref Discord.User otherUser) =>
@@ -79,6 +77,7 @@ namespace StardewValleyDRP
             {
                 var currentUser = userManager.GetCurrentUser();
                 this.Monitor.Log($"Discord User: {currentUser.Username}#{currentUser.Discriminator}", LogLevel.Debug);
+                Update(null, null, discord, Activity);
                 //this.Monitor.Log($"Discriminator: {currentUser.Discriminator}", LogLevel.Debug);
                 //this.Monitor.Log($"ID: {currentUser.Id}", LogLevel.Debug);
             };
@@ -115,11 +114,21 @@ namespace StardewValleyDRP
 #endif
             var activityManager = discord.GetActivityManager();
             activityManager.RegisterSteam(413150);
-            activityManager.RegisterCommand("steam://run-game-id/413150");
+            //activityManager.RegisterCommand("steam://run-game-id/413150");
             try
             {
                 if (e.IsMultipleOf(30))
                 {
+                    activityManager.UpdateActivity(CheckActivity(activity), (result) =>
+                    {
+                        if (result != Discord.Result.Ok)
+                            this.Monitor.Log($"Update Activity: {result}", LogLevel.Warn);
+                    });
+
+                    discord.RunCallbacks();
+                } else if (e == null) // should only happen once, for loading screen displayability
+                {
+                    this.Monitor.Log($"Init Discord setup", LogLevel.Info);
                     activityManager.UpdateActivity(CheckActivity(activity), (result) =>
                     {
                         if (result != Discord.Result.Ok)
@@ -141,12 +150,12 @@ namespace StardewValleyDRP
             if (!Context.IsWorldReady)
             {
                 a.State = "In a Menu";
-                a.Details = " ";
-                a.Assets.LargeText = " ";
+                a.Details = "Living the Farm Life";
+                a.Assets.LargeText = "Stardew";
                 a.Assets.LargeImage = "menu_small_icon";
-                a.Assets.SmallText = " ";
+                a.Assets.SmallText = "Yes";
                 a.Assets.SmallImage = "menu_small_icon";
-                a.Timestamps.Start = 0;
+                a.Timestamps.Start = 5;
                 a.Party.Size.CurrentSize = 1;
                 a.Party.Size.MaxSize = 1;
             }
@@ -173,9 +182,9 @@ namespace StardewValleyDRP
                 a.Assets.LargeText = $"At {SplitName(Game1.currentLocation.Name)}";
                 a.Assets.SmallImage = $"weather_{Weather_type()}_icon";
                 a.Assets.SmallText = $"Day {Game1.dayOfMonth} of {Season()}, Year {Game1.year}";
-                a.Timestamps.Start = InGameTime();
+                a.Timestamps.Start = InGameTime(); //InGameTime(); //Game1.timeOfDay;
 #if DEBUG
-                this.Monitor.Log($"Ingame Time UTC: {InGameTime()}", LogLevel.Debug);
+                this.Monitor.Log($"Ingame Time UTC: {InGameTime()} vs. {Game1.timeOfDay}", LogLevel.Debug);
 #endif
             }
             return a;
@@ -293,16 +302,26 @@ namespace StardewValleyDRP
         /// Turns the ingame time into a unix timestamp for the discord API
         /// </summary>
         /// <returns>The game time.</returns>
-        private int InGameTime()
+        private long InGameTime()
         {
-            int hours = Game1.timeOfDay % 1000 + Game1.timeOfDay % 10000;
-            int mins  = Game1.timeOfDay % 10 + Game1.timeOfDay % 100;
-#if UTCOFFSET
-            return ((hours * 60 * 60) + (mins * 60) + (DateTimeOffset.Now.Hour * 60 * 60) + (DateTimeOffset.Now.Minute * 60));
-#else
-            return hours/2 + mins/3;
-            //return ((hours * 60 * 60) + (mins * 60));
+            /*
+             * 0630
+             *    ^
+             *   ^
+             *  ^
+             * ^            
+             */           
+            long hours = (Game1.timeOfDay % 10000) / 100;
+            long mins  = (Game1.timeOfDay % 100  );
+            DateTime current = DateTime.UtcNow;
+            DateTime UTCCE = new DateTime(1970,1,1);
+            TimeSpan time = current.Subtract(UTCCE);
+            long offset = ((long)time.TotalSeconds / 100) * 100; // gets rid of the 'seconds' param
+#if DEBUG
+            this.Monitor.Log($"Hours {hours} minutes {mins} | UTC {time.TotalSeconds} offset {offset}", LogLevel.Debug);
+            this.Monitor.Log($"Hours in sec {hours * 3600 } minutes in sec {mins * 60}", LogLevel.Debug);
 #endif
+            return (offset) - ((hours * 60 /*minutes*/ * 60 /*seconds*/) + (mins * 60 /*seconds*/));
         }
     }
 }
